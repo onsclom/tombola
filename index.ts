@@ -5,8 +5,9 @@ document.body.appendChild(canvas);
 
 const LINE_WIDTH = 0.05;
 const GAME_AREA = 10;
-const INIT_GRAVITY = 0.00005;
-const IMPACT_THRESHOLD = 0.005;
+const INIT_GRAVITY = 3e-6;
+const IMPACT_THRESHOLD = 3e-4;
+const MAX_DT = 33;
 
 const polygonPoints = 6;
 const polygonRadius = 4;
@@ -27,7 +28,7 @@ const state = {
     vx: number;
     vy: number;
     r: number;
-    hz: number;
+    freq: number;
   }[],
   // lines
   lineRotation: 0,
@@ -36,21 +37,21 @@ const state = {
 // init
 const ballAmount = 5;
 for (let i = 0; i < ballAmount; i++) {
-  const jitter = 0.1;
+  const jitter = 0.006;
   state.balls.push({
     x: 0,
     y: 0,
     vx: Math.random() * jitter - jitter * 0.5,
     vy: Math.random() * jitter - jitter * 0.5,
     r: 0.2,
-    hz: aMajorNotes[Math.floor(Math.random() * aMajorNotes.length)]!,
+    freq: aMajorNotes[Math.floor(Math.random() * aMajorNotes.length)]!,
   });
 }
 
-let lastTime = 0;
+let lastTime = performance.now();
 function tick() {
   const now = performance.now();
-  const dt = now - lastTime;
+  const dt = Math.min(now - lastTime, MAX_DT);
   lastTime = now;
 
   const canvasRect = canvas.getBoundingClientRect();
@@ -85,29 +86,25 @@ function tick() {
     const y1 = rotatedPoints[i]!.y;
     const x2 = rotatedPoints[(i + 1) % polygonPoints]!.x;
     const y2 = rotatedPoints[(i + 1) % polygonPoints]!.y;
-    lines.push({ x1, y1, x2, y2, w: 0.5 * LINE_WIDTH });
+    lines.push({ x1, y1, x2, y2, w: LINE_WIDTH });
   }
 
-  // gravity
   for (const ball of state.balls) {
     ball.vy += state.gravity * dt;
-  }
-
-  for (const ball of state.balls) {
-    ball.x += ball.vx;
-    ball.y += ball.vy;
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
   }
 
   // check for collisions
   for (const ball of state.balls) {
-    for (const walls of lines) {
+    for (const line of lines) {
       const ballRelativeToFirstPoint = {
-        x: ball.x - walls.x1,
-        y: ball.y - walls.y1,
+        x: ball.x - line.x1,
+        y: ball.y - line.y1,
       };
       const secondPointRelativeToFirstPoint = {
-        x: walls.x2 - walls.x1,
-        y: walls.y2 - walls.y1,
+        x: line.x2 - line.x1,
+        y: line.y2 - line.y1,
       };
 
       const lineLengthSq =
@@ -121,17 +118,17 @@ function tick() {
       const t = Math.max(0, Math.min(1, dotProduct / lineLengthSq));
 
       const closestPoint = {
-        x: walls.x1 + t * secondPointRelativeToFirstPoint.x,
-        y: walls.y1 + t * secondPointRelativeToFirstPoint.y,
+        x: line.x1 + t * secondPointRelativeToFirstPoint.x,
+        y: line.y1 + t * secondPointRelativeToFirstPoint.y,
       };
 
       const dist = Math.sqrt(
         (ball.x - closestPoint.x) ** 2 + (ball.y - closestPoint.y) ** 2,
       );
-      if (dist < ball.r + walls.w * 0.5) {
+      if (dist < ball.r + line.w * 0.5) {
         const nx = (ball.x - closestPoint.x) / dist;
         const ny = (ball.y - closestPoint.y) / dist;
-        const overlap = ball.r + walls.w * 0.5 - dist;
+        const overlap = ball.r + line.w * 0.5 - dist;
         ball.x += nx * overlap;
         ball.y += ny * overlap;
 
@@ -139,7 +136,7 @@ function tick() {
         if (vDotN < 0) {
           ball.vx -= 2 * vDotN * nx;
           ball.vy -= 2 * vDotN * ny;
-          if (-vDotN > IMPACT_THRESHOLD) playSound(ball.hz);
+          if (-vDotN > IMPACT_THRESHOLD) playSound(ball.freq);
         }
       }
     }
@@ -149,7 +146,7 @@ function tick() {
   //////////////////////////
 
   ctx.fillStyle = "black";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(0, 0, canvasRect.width, canvasRect.height);
 
   // letter box to game area
   {
