@@ -3,7 +3,7 @@ import { aMajorNotes, playSound } from "./sound";
 const canvas = document.createElement("canvas");
 document.body.appendChild(canvas);
 
-const LINE_WIDTH = 0.1;
+const LINE_WIDTH = 0.05;
 const GAME_AREA = 10;
 const INIT_GRAVITY = 0.00005;
 const IMPACT_THRESHOLD = 0.005;
